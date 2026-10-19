@@ -1,0 +1,36 @@
+# A pull request's entries: digests, archives, manifests (genindex -check), the protocol checker on
+# the Linux build, and the build's attestation against the pinned commit.
+name: check
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Entries
+        run: go vet ./... && go run ./tools/genindex -check
+      - name: Changed entries' archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          go build -o rhun-ext-check github.com/rhun-editor/extension-protocol/conformance/ext@latest 2>/dev/null \
+            || { go install github.com/rhun-editor/extension-protocol/conformance/ext@latest && cp "$(go env GOPATH)/bin/ext" rhun-ext-check; }
+          for f in $(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- '*/*.ini' | grep -v '^pending/'); do
+            full=${f%.ini}; name=${full#*/}
+            tag=$(sed -n 's/^tag = //p' "$f"); commit=$(sed -n 's/^commit = //p' "$f")
+            dir=$(mktemp -d)
+            gh release download "$tag" -R "$full" -p "$name-linux-x86_64.tar.gz" -D "$dir"
+            gh attestation verify "$dir/$name-linux-x86_64.tar.gz" -R "$full" \
+              --source-digest "$commit" --signer-workflow rhun-editor/template-go/.github/workflows/release.yml \
+              || gh attestation verify "$dir/$name-linux-x86_64.tar.gz" -R "$full" --source-digest "$commit" \
+                   --signer-workflow rhun-editor/template-rust/.github/workflows/release.yml
+            mkdir "$dir/x" && tar -xzf "$dir/$name-linux-x86_64.tar.gz" -C "$dir/x"
+            ./rhun-ext-check "$dir/x"
+          done

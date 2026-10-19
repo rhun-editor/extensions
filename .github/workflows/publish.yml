@@ -1,0 +1,24 @@
+# Every merge to main publishes the index as a new release; rhun fetches
+# releases/latest/download/index.ini and checks it against sha256sums.txt.
+name: publish
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Generate
+        run: go run ./tools/genindex -out dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="index-$(date -u +%Y%m%d-%H%M%S)"
+          gh release create "$tag" dist/index.ini dist/sha256sums.txt --title "$tag" --notes "The rhun extensions index."

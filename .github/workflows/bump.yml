@@ -1,0 +1,41 @@
+# Daily: a listed extension with a newer release gets a pull request pinning it (the review still
+# decides). The new pin's digests come from the release's sha256sums.txt.
+name: bump
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open pull requests for new releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "rhun index bot"
+          git config user.email "index@rhun.app"
+          for f in */*.ini; do
+            case $f in pending/*) continue ;; esac
+            full=${f%.ini}; name=${full#*/}
+            have=$(sed -n 's/^tag = //p' "$f")
+            loc=$(curl -sS -o /dev/null -w '%{redirect_url}' "https://github.com/$full/releases/latest")
+            tag=${loc##*/releases/tag/}
+            [ -n "$tag" ] && [ "$tag" != "$loc" ] && [ "$tag" != "$have" ] || continue
+            branch="bump-$name-$tag"
+            git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null && continue
+            git checkout -q -B "$branch" origin/main
+            sums=$(curl -fsSL "https://github.com/$full/releases/download/$tag/sha256sums.txt") || continue
+            commit=$(git ls-remote "https://github.com/$full" "refs/tags/$tag^{}" "refs/tags/$tag" | tail -1 | cut -f1)
+            sed -i -e "s/^tag = .*/tag = $tag/" -e "s/^commit = .*/commit = $commit/" "$f"
+            for t in linux-x86_64 macos-arm64 windows-x64; do
+              d=$(echo "$sums" | awk -v a="$name-$t.tar.gz" '$2 == a || $2 == "*" a { print $1 }')
+              [ -n "$d" ] && sed -i "s/^sha256\.$t = .*/sha256.$t = $d/" "$f"
+            done
+            git commit -q -am "$full $tag" && git push -q origin "$branch"
+            gh pr create --head "$branch" --title "$full $tag" --body "A new release of $full. Review the source between the pinned commits before merging."
+          done
