@@ -1,5 +1,6 @@
 # A pull request's entries: digests, archives, manifests (genindex -check), the protocol checker on
-# the Linux build, and the build's attestation against the pinned commit.
+# the Linux build, and the build's attestation against the pinned commit and the extension's own
+# release workflow.
 name: check
 on: pull_request
 permissions:
@@ -20,17 +21,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          go build -o rhun-ext-check github.com/rhun-editor/extension-protocol/conformance/ext@latest 2>/dev/null \
-            || { go install github.com/rhun-editor/extension-protocol/conformance/ext@latest && cp "$(go env GOPATH)/bin/ext" rhun-ext-check; }
-          for f in $(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- '*/*.ini' | grep -v '^pending/'); do
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/rhun-editor/extension-protocol/conformance/ext@latest
+          for f in $(git diff --name-only --diff-filter=AM "origin/${GITHUB_BASE_REF}...HEAD" -- '*/*.ini' | grep -v '^pending/'); do
             full=${f%.ini}; name=${full#*/}
             tag=$(sed -n 's/^tag = //p' "$f"); commit=$(sed -n 's/^commit = //p' "$f")
             dir=$(mktemp -d)
             gh release download "$tag" -R "$full" -p "$name-linux-x86_64.tar.gz" -D "$dir"
+            # built from the pinned commit by the extension's own release workflow (as the templates
+            # have it), whose source the review reads at that commit
             gh attestation verify "$dir/$name-linux-x86_64.tar.gz" -R "$full" \
-              --source-digest "$commit" --signer-workflow rhun-editor/template-go/.github/workflows/release.yml \
-              || gh attestation verify "$dir/$name-linux-x86_64.tar.gz" -R "$full" --source-digest "$commit" \
-                   --signer-workflow rhun-editor/template-rust/.github/workflows/release.yml
-            mkdir "$dir/x" && tar -xzf "$dir/$name-linux-x86_64.tar.gz" -C "$dir/x"
-            ./rhun-ext-check "$dir/x"
+              --source-digest "$commit" --signer-workflow "$full/.github/workflows/release.yml"
+            # the checker wants the folder rhun installs: OWNER/NAME
+            mkdir -p "$dir/x/$full" && tar -xzf "$dir/$name-linux-x86_64.tar.gz" -C "$dir/x/$full"
+            "$RUNNER_TEMP/bin/ext" "$dir/x/$full"
           done

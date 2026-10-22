@@ -11,8 +11,8 @@ keywords = demo tour example
 maintainer = vshvedov
 featured = yes
 # the reviewed release; a new version is a new pull request
-tag = v0.1.2
-commit = 93fff6aa75bf1e7063f912a17089ee58963bbc21
+tag = v0.2.0
+commit = e50c6a26d8495814bc1a384997ed4020f77b0820
 sha256.linux-x86_64 = …
 sha256.macos-arm64 = …
 sha256.windows-x64 = …
@@ -33,8 +33,9 @@ Open a pull request that adds or changes `OWNER/NAME.ini`. Its checks (`.github/
   no links or devices in the archive;
 - `rhun-ext-check` on the Linux build (the protocol's checker, from
   github.com/rhun-editor/extension-protocol);
-- `gh attestation verify` of each archive against the pinned commit and the template's reusable
-  release workflow;
+- `gh attestation verify` of each archive against the pinned commit and the extension's own
+  `.github/workflows/release.yml` (the one template-go and template-rust ship, which attests the
+  archives with `actions/attest-build-provenance`), so the review reads that workflow too;
 - a review of the source between the previously pinned commit and the new one.
 
 A person merges. A scheduled job (`bump.yml`) opens the pull request for a new release of a listed
@@ -57,9 +58,9 @@ generated = 2026-10-19T08:00:00Z
 [rhun-editor/showcase]
 title = Showcase
 description = A tour of everything an extension can do in rhun: commands, edits, marks, prompts and more.
-version = 0.1.2
-tag = v0.1.2
-commit = 93fff6a…
+version = 0.2.0
+tag = v0.2.0
+commit = e50c6a2…
 sha256.linux-x86_64 = …
 sha256.macos-arm64 = …
 sha256.windows-x64 = …
