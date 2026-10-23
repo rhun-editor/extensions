@@ -146,7 +146,7 @@ func needs(m ini) string {
 			w = append(w, k+"="+v)
 		}
 	}
-	for _, k := range []string{"network", "terminal"} {
+	for _, k := range []string{"network", "terminal", "audio"} {
 		if m["needs."+k] == "yes" {
 			w = append(w, k+"=yes")
 		}

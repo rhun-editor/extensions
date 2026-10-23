@@ -16,12 +16,13 @@ jobs:
         with:
           go-version: "1.25"
       - name: Entries
-        run: go vet ./... && go run ./tools/genindex -check
+        run: go vet ./... && go test ./... && go run ./tools/genindex -check
       - name: Changed entries' archives
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          GOBIN="$RUNNER_TEMP/bin" go install github.com/rhun-editor/extension-protocol/conformance/ext@latest
+          # rhun 0.18.2: local audio permissions and continuously animated pictures.
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/rhun-editor/extension-protocol/conformance/ext@b5c19dc7ebd997cef28b99a87aefde6d990abbdf
           for f in $(git diff --name-only --diff-filter=AM "origin/${GITHUB_BASE_REF}...HEAD" -- '*/*.ini' | grep -v '^pending/'); do
             full=${f%.ini}; name=${full#*/}
             tag=$(sed -n 's/^tag = //p' "$f"); commit=$(sed -n 's/^commit = //p' "$f")
